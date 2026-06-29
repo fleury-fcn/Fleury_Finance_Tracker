@@ -1,0 +1,1851 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fleury Finance Tracker</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --color-bg: #0f1419;
+            --color-surface: #1a1f2e;
+            --color-border: #2a3f5f;
+            --color-text: #e0e0e0;
+            --color-text-muted: #999;
+            --color-accent-green: #10b981;
+            --color-accent-red: #ef4444;
+            --color-accent-blue: #3b82f6;
+            --color-positive: #10b981;
+            --color-negative: #ef4444;
+        }
+
+        @media (prefers-color-scheme: light) {
+            :root {
+                --color-bg: #f9fafb;
+                --color-surface: #ffffff;
+                --color-border: #e5e7eb;
+                --color-text: #1f2937;
+                --color-text-muted: #6b7280;
+            }
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background-color: var(--color-bg);
+            color: var(--color-text);
+            line-height: 1.6;
+            overflow-x: hidden;
+        }
+
+        /* Layout */
+        .app-container {
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* Desktop Sidebar */
+        .sidebar {
+            display: none;
+            width: 280px;
+            background: var(--color-surface);
+            border-right: 1px solid var(--color-border);
+            padding: 20px;
+            overflow-y: auto;
+            flex-direction: column;
+        }
+
+        .sidebar-header {
+            font-size: 18px;
+            font-weight: 700;
+            margin-bottom: 30px;
+            color: var(--color-accent-blue);
+        }
+
+        .sidebar-nav {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            flex: 1;
+        }
+
+        .sidebar-nav button {
+            padding: 12px 16px;
+            border: none;
+            background: transparent;
+            color: var(--color-text);
+            cursor: pointer;
+            border-radius: 8px;
+            text-align: left;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+
+        .sidebar-nav button:hover {
+            background: var(--color-border);
+        }
+
+        .sidebar-nav button.active {
+            background: var(--color-accent-blue);
+            color: white;
+        }
+
+        @media (min-width: 1024px) {
+            .sidebar {
+                display: flex;
+            }
+
+            .app-container {
+                flex-direction: row;
+            }
+
+            .main-content {
+                flex: 1;
+                overflow-y: auto;
+            }
+
+            .tab-bar {
+                display: none;
+            }
+        }
+
+        /* Mobile Tab Bar */
+        .tab-bar {
+            display: flex;
+            height: 60px;
+            background: var(--color-surface);
+            border-top: 1px solid var(--color-border);
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            z-index: 100;
+        }
+
+        .tab-bar button {
+            flex: 1;
+            border: none;
+            background: transparent;
+            color: var(--color-text-muted);
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 500;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+            transition: color 0.2s;
+        }
+
+        .tab-bar button.active {
+            color: var(--color-accent-blue);
+        }
+
+        .tab-icon {
+            font-size: 20px;
+        }
+
+        /* Main Content */
+        .main-content {
+            flex: 1;
+            overflow-y: auto;
+            padding-bottom: 70px;
+        }
+
+        @media (min-width: 1024px) {
+            .main-content {
+                padding-bottom: 0;
+            }
+        }
+
+        /* Tabs */
+        .tab {
+            display: none;
+            animation: fadeIn 0.2s;
+        }
+
+        .tab.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Page Container */
+        .page-container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        @media (min-width: 1024px) {
+            .page-container {
+                padding: 40px;
+            }
+        }
+
+        /* Header */
+        .page-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+        }
+
+        .page-title {
+            font-size: 24px;
+            font-weight: 700;
+        }
+
+        .sync-badge {
+            font-size: 12px;
+            padding: 6px 12px;
+            background: var(--color-border);
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .sync-badge.synced {
+            color: var(--color-accent-green);
+        }
+
+        .sync-badge.syncing {
+            color: var(--color-text-muted);
+        }
+
+        .sync-badge.offline {
+            color: var(--color-accent-red);
+        }
+
+        /* Cards */
+        .card {
+            background: var(--color-surface);
+            border: 1px solid var(--color-border);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 16px;
+        }
+
+        .summary-cards {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        @media (min-width: 640px) {
+            .summary-cards {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
+
+        .summary-card {
+            background: var(--color-surface);
+            border: 1px solid var(--color-border);
+            border-radius: 12px;
+            padding: 16px;
+            text-align: center;
+        }
+
+        .summary-card.full-width {
+            grid-column: 1 / -1;
+        }
+
+        .summary-label {
+            font-size: 12px;
+            color: var(--color-text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
+        }
+
+        .summary-value {
+            font-size: 16px;
+            font-weight: 700;
+            line-height: 1.4;
+        }
+
+        .summary-value-bif {
+            color: var(--color-accent-green);
+        }
+
+        .summary-value-eur {
+            font-size: 14px;
+            color: var(--color-text-muted);
+        }
+
+        .summary-card.balance-positive .summary-value-bif {
+            color: var(--color-accent-green);
+        }
+
+        .summary-card.balance-negative .summary-value-bif {
+            color: var(--color-accent-red);
+        }
+
+        /* Entry List */
+        .entry-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .entry-item {
+            background: var(--color-surface);
+            border: 1px solid var(--color-border);
+            border-radius: 8px;
+            padding: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            transition: all 0.2s;
+        }
+
+        .entry-item:hover {
+            border-color: var(--color-accent-blue);
+        }
+
+        .entry-info {
+            flex: 1;
+        }
+
+        .entry-label {
+            font-weight: 500;
+            margin-bottom: 4px;
+        }
+
+        .entry-category {
+            font-size: 12px;
+            color: var(--color-text-muted);
+        }
+
+        .entry-amount {
+            text-align: right;
+            font-weight: 600;
+            font-size: 14px;
+            line-height: 1.3;
+        }
+
+        .entry-amount-bif {
+            color: var(--color-text);
+        }
+
+        .entry-amount-eur {
+            font-size: 12px;
+            color: var(--color-text-muted);
+        }
+
+        .entry-amount.income {
+            color: var(--color-accent-green);
+        }
+
+        .entry-amount.expense {
+            color: var(--color-accent-red);
+        }
+
+        .entry-actions {
+            display: flex;
+            gap: 8px;
+            margin-left: 12px;
+        }
+
+        .btn-delete {
+            padding: 4px 8px;
+            border: none;
+            background: transparent;
+            color: var(--color-accent-red);
+            cursor: pointer;
+            font-size: 12px;
+            border-radius: 4px;
+            transition: all 0.2s;
+        }
+
+        .btn-delete:active {
+            background: rgba(239, 68, 68, 0.1);
+        }
+
+        /* Buttons */
+        button {
+            cursor: pointer;
+            font-size: inherit;
+            border-radius: 8px;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background: var(--color-accent-blue);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            font-weight: 600;
+            width: 100%;
+            min-height: 44px;
+        }
+
+        .btn-primary:active {
+            opacity: 0.9;
+        }
+
+        .btn-secondary {
+            background: var(--color-border);
+            color: var(--color-text);
+            border: none;
+            padding: 10px 16px;
+            font-weight: 500;
+        }
+
+        .btn-secondary:active {
+            background: var(--color-border);
+            opacity: 0.8;
+        }
+
+        /* Inputs */
+        input, select, textarea {
+            background: var(--color-surface);
+            color: var(--color-text);
+            border: 1px solid var(--color-border);
+            border-radius: 8px;
+            padding: 12px;
+            font-family: inherit;
+            font-size: 16px;
+            width: 100%;
+            margin-bottom: 12px;
+            transition: all 0.2s;
+        }
+
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: var(--color-accent-blue);
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+
+        input[type="number"] {
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        /* Toggle Button */
+        .toggle-group {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+
+        .toggle-button {
+            flex: 1;
+            padding: 12px;
+            border: 1px solid var(--color-border);
+            background: var(--color-surface);
+            color: var(--color-text);
+            border-radius: 8px;
+            font-weight: 600;
+            min-height: 44px;
+            transition: all 0.2s;
+        }
+
+        .toggle-button.active {
+            background: var(--color-accent-blue);
+            color: white;
+            border-color: var(--color-accent-blue);
+        }
+
+        /* Category Pills */
+        .category-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+
+        @media (min-width: 480px) {
+            .category-grid {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
+
+        .category-pill {
+            padding: 10px 12px;
+            border: 1px solid var(--color-border);
+            background: var(--color-surface);
+            color: var(--color-text);
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 500;
+            transition: all 0.2s;
+            min-height: 40px;
+        }
+
+        .category-pill:active,
+        .category-pill.selected {
+            background: var(--color-accent-blue);
+            color: white;
+            border-color: var(--color-accent-blue);
+        }
+
+        /* Date Navigation */
+        .date-nav {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 24px;
+        }
+
+        .date-nav button {
+            padding: 8px 12px;
+            border: none;
+            background: var(--color-border);
+            color: var(--color-text);
+            border-radius: 6px;
+            font-size: 18px;
+            min-width: 40px;
+            min-height: 40px;
+        }
+
+        .date-display {
+            font-size: 16px;
+            font-weight: 600;
+            text-align: center;
+            flex: 1;
+        }
+
+        /* Conversion Preview */
+        .conversion-preview {
+            font-size: 12px;
+            color: var(--color-text-muted);
+            margin-top: -8px;
+            margin-bottom: 12px;
+            text-align: right;
+        }
+
+        /* Table */
+        .report-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+            font-size: 13px;
+        }
+
+        .report-table th,
+        .report-table td {
+            padding: 10px;
+            text-align: right;
+            border-bottom: 1px solid var(--color-border);
+        }
+
+        .report-table th {
+            background: var(--color-border);
+            font-weight: 600;
+            text-align: center;
+        }
+
+        .report-table td:first-child,
+        .report-table th:first-child {
+            text-align: left;
+        }
+
+        .report-table tr.highlight {
+            background: var(--color-border);
+        }
+
+        .report-table .currency-line {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .currency-bif {
+            font-weight: 600;
+        }
+
+        .currency-eur {
+            font-size: 11px;
+            color: var(--color-text-muted);
+        }
+
+        /* Chart Container */
+        .chart-container {
+            position: relative;
+            height: 300px;
+            margin: 20px 0;
+        }
+
+        /* Accordion */
+        .accordion {
+            border: 1px solid var(--color-border);
+            border-radius: 8px;
+            overflow: hidden;
+            margin-top: 20px;
+        }
+
+        .accordion-header {
+            padding: 16px;
+            background: var(--color-border);
+            border: none;
+            cursor: pointer;
+            font-weight: 600;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            width: 100%;
+            font-size: 14px;
+        }
+
+        .accordion-header:active {
+            background: var(--color-border);
+            opacity: 0.8;
+        }
+
+        .accordion-icon {
+            transition: transform 0.2s;
+        }
+
+        .accordion-icon.open {
+            transform: rotate(180deg);
+        }
+
+        .accordion-content {
+            display: none;
+            padding: 16px;
+            background: var(--color-surface);
+            border-top: 1px solid var(--color-border);
+            font-size: 13px;
+            line-height: 1.6;
+        }
+
+        .accordion-content.open {
+            display: block;
+        }
+
+        .accordion-content ol {
+            margin-left: 20px;
+            margin-top: 10px;
+        }
+
+        .accordion-content li {
+            margin-bottom: 8px;
+            padding-left: 8px;
+        }
+
+        .accordion-content code {
+            background: var(--color-border);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: 'Monaco', 'Courier New', monospace;
+            font-size: 12px;
+        }
+
+        /* Month Selector */
+        .month-nav {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 24px;
+            gap: 12px;
+        }
+
+        .month-nav button {
+            padding: 8px 12px;
+            border: none;
+            background: var(--color-border);
+            color: var(--color-text);
+            border-radius: 6px;
+            font-size: 16px;
+            min-width: 40px;
+            min-height: 40px;
+        }
+
+        .month-display {
+            font-weight: 600;
+            text-align: center;
+            flex: 1;
+        }
+
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: var(--color-text-muted);
+        }
+
+        .empty-state-icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+        }
+
+        /* Modal/Overlay */
+        .modal {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            overflow-y: auto;
+            padding: 20px;
+        }
+
+        .modal.open {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-content {
+            background: var(--color-surface);
+            border-radius: 12px;
+            padding: 24px;
+            max-width: 500px;
+            width: 100%;
+        }
+
+        .modal-title {
+            font-size: 18px;
+            font-weight: 700;
+            margin-bottom: 16px;
+        }
+
+        .modal-close {
+            position: absolute;
+            top: 16px;
+            right: 16px;
+            background: transparent;
+            border: none;
+            color: var(--color-text);
+            font-size: 24px;
+            cursor: pointer;
+            padding: 0;
+            width: 32px;
+            height: 32px;
+        }
+
+        /* Form Group */
+        .form-group {
+            margin-bottom: 16px;
+        }
+
+        .form-label {
+            display: block;
+            font-weight: 500;
+            margin-bottom: 6px;
+            font-size: 13px;
+        }
+
+        /* Success Message */
+        .success-message {
+            background: rgba(16, 185, 129, 0.1);
+            color: var(--color-accent-green);
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 16px;
+            font-size: 13px;
+        }
+
+        .error-message {
+            background: rgba(239, 68, 68, 0.1);
+            color: var(--color-accent-red);
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 16px;
+            font-size: 13px;
+        }
+
+        /* Password visibility */
+        .password-input-group {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+
+        .password-input-group input {
+            flex: 1;
+            margin-bottom: 0;
+        }
+
+        .password-toggle {
+            position: absolute;
+            right: 12px;
+            background: none;
+            border: none;
+            color: var(--color-text-muted);
+            cursor: pointer;
+            padding: 0;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* Print Styles */
+        @media print {
+            .sidebar, .tab-bar, .sync-badge, .btn-delete, .btn-primary {
+                display: none;
+            }
+
+            .page-container {
+                max-width: 100%;
+                padding: 0;
+            }
+
+            .report-table {
+                break-inside: avoid;
+            }
+        }
+
+        /* Loading spinner */
+        .spinner {
+            display: inline-block;
+            width: 14px;
+            height: 14px;
+            border: 2px solid var(--color-border);
+            border-top-color: var(--color-accent-blue);
+            border-radius: 50%;
+            animation: spin 0.6s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Desktop Sidebar -->
+        <nav class="sidebar">
+            <div class="sidebar-header">💰 Fleury Finance</div>
+            <div class="sidebar-nav">
+                <button class="nav-button active" data-tab="dashboard">
+                    📊 Tableau de bord
+                </button>
+                <button class="nav-button" data-tab="add-entry">
+                    ➕ Ajouter
+                </button>
+                <button class="nav-button" data-tab="report">
+                    📈 Rapport
+                </button>
+                <button class="nav-button" data-tab="settings">
+                    ⚙️ Paramètres
+                </button>
+            </div>
+        </nav>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <!-- Dashboard Tab -->
+            <div id="dashboard" class="tab active">
+                <div class="page-container">
+                    <div class="page-header">
+                        <h1 class="page-title">Tableau de bord</h1>
+                        <div class="sync-badge synced" id="syncBadge">
+                            <span id="syncIcon">✅</span>
+                            <span id="syncText">Synchronisé</span>
+                        </div>
+                    </div>
+
+                    <div class="date-nav">
+                        <button id="prevDayBtn" style="flex: 0 0 40px;">←</button>
+                        <div class="date-display" id="dateDisplay"></div>
+                        <button id="nextDayBtn" style="flex: 0 0 40px;">→</button>
+                    </div>
+
+                    <div class="summary-cards">
+                        <div class="summary-card">
+                            <div class="summary-label">Revenus</div>
+                            <div class="summary-value">
+                                <div class="summary-value-bif" id="dailyIncomeValue">0 BIF</div>
+                                <div class="summary-value-eur" id="dailyIncomeValueEur">≈ 0 €</div>
+                            </div>
+                        </div>
+                        <div class="summary-card">
+                            <div class="summary-label">Dépenses</div>
+                            <div class="summary-value">
+                                <div class="summary-value-bif" id="dailyExpenseValue">0 BIF</div>
+                                <div class="summary-value-eur" id="dailyExpenseValueEur">≈ 0 €</div>
+                            </div>
+                        </div>
+                        <div class="summary-card balance-positive" id="balanceCard">
+                            <div class="summary-label">Bilan</div>
+                            <div class="summary-value">
+                                <div class="summary-value-bif" id="dailyBalanceValue">0 BIF</div>
+                                <div class="summary-value-eur" id="dailyBalanceValueEur">≈ 0 €</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <h2 style="font-size: 16px; margin-top: 30px; margin-bottom: 16px;">Transactions du jour</h2>
+                    <div id="entryList" class="entry-list">
+                        <div class="empty-state">
+                            <div class="empty-state-icon">📭</div>
+                            <p>Aucune transaction aujourd'hui</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Add Entry Tab -->
+            <div id="add-entry" class="tab">
+                <div class="page-container">
+                    <h1 class="page-title" style="margin-bottom: 30px;">Ajouter une transaction</h1>
+
+                    <div class="toggle-group">
+                        <button class="toggle-button active" data-type="income">
+                            💚 Revenu
+                        </button>
+                        <button class="toggle-button" data-type="expense">
+                            ❌ Dépense
+                        </button>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Devise</label>
+                        <div class="toggle-group">
+                            <button class="toggle-button active" data-currency="BIF">
+                                BIF
+                            </button>
+                            <button class="toggle-button" data-currency="EUR">
+                                EUR
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Montant</label>
+                        <input type="number" id="amountInput" placeholder="0" min="0" step="0.01">
+                        <div class="conversion-preview" id="conversionPreview"></div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Description</label>
+                        <input type="text" id="labelInput" placeholder="Ex: Courses marché">
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" id="categoryLabel">Catégorie Revenu</label>
+                        <div class="category-grid" id="categoryGrid"></div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Date</label>
+                        <input type="date" id="dateInput">
+                    </div>
+
+                    <button class="btn-primary" id="addEntryBtn">Ajouter</button>
+                </div>
+            </div>
+
+            <!-- Report Tab -->
+            <div id="report" class="tab">
+                <div class="page-container">
+                    <h1 class="page-title" style="margin-bottom: 30px;">Rapport mensuel</h1>
+
+                    <div class="month-nav">
+                        <button id="prevMonthBtn">←</button>
+                        <div class="month-display" id="monthDisplay"></div>
+                        <button id="nextMonthBtn">→</button>
+                    </div>
+
+                    <div class="summary-cards">
+                        <div class="summary-card">
+                            <div class="summary-label">Revenus</div>
+                            <div class="summary-value">
+                                <div class="summary-value-bif" id="monthlyIncomeValue">0 BIF</div>
+                                <div class="summary-value-eur" id="monthlyIncomeValueEur">≈ 0 €</div>
+                            </div>
+                        </div>
+                        <div class="summary-card">
+                            <div class="summary-label">Dépenses</div>
+                            <div class="summary-value">
+                                <div class="summary-value-bif" id="monthlyExpenseValue">0 BIF</div>
+                                <div class="summary-value-eur" id="monthlyExpenseValueEur">≈ 0 €</div>
+                            </div>
+                        </div>
+                        <div class="summary-card" id="monthlyBalanceCard">
+                            <div class="summary-label">Épargne nette</div>
+                            <div class="summary-value">
+                                <div class="summary-value-bif" id="monthlyBalanceValue">0 BIF</div>
+                                <div class="summary-value-eur" id="monthlyBalanceValueEur">≈ 0 €</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <h2 style="font-size: 16px; margin-top: 30px; margin-bottom: 16px;">Dépenses par catégorie</h2>
+                    <div class="chart-container">
+                        <canvas id="expenseChart"></canvas>
+                    </div>
+
+                    <h2 style="font-size: 16px; margin-top: 30px; margin-bottom: 16px;">Détail quotidien</h2>
+                    <table class="report-table">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th colspan="2">Revenus</th>
+                                <th colspan="2">Dépenses</th>
+                                <th colspan="2">Bilan</th>
+                            </tr>
+                        </thead>
+                        <tbody id="reportTableBody">
+                        </tbody>
+                    </table>
+
+                    <button class="btn-secondary" onclick="window.print()" style="margin-top: 20px; width: 100%;">
+                        🖨️ Imprimer
+                    </button>
+                </div>
+            </div>
+
+            <!-- Settings Tab -->
+            <div id="settings" class="tab">
+                <div class="page-container">
+                    <h1 class="page-title" style="margin-bottom: 30px;">Paramètres</h1>
+
+                    <div id="settingsMessage"></div>
+
+                    <div class="card">
+                        <h2 style="font-size: 16px; margin-bottom: 16px;">GitHub Gist</h2>
+
+                        <div class="form-group">
+                            <label class="form-label">Token Personal Access</label>
+                            <div class="password-input-group">
+                                <input type="password" id="tokenInput" placeholder="ghp_...">
+                                <button class="password-toggle" id="tokenToggle">👁️</button>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label">ID Gist</label>
+                            <input type="text" id="gistIdInput" placeholder="abc123...">
+                        </div>
+
+                        <div class="toggle-group" style="margin-bottom: 16px;">
+                            <button class="btn-secondary" id="testConnectionBtn" style="margin-bottom: 0;">
+                                🔗 Tester connexion
+                            </button>
+                            <button class="btn-secondary" id="createGistBtn" style="margin-bottom: 0;">
+                                ✨ Créer un Gist
+                            </button>
+                        </div>
+
+                        <button class="btn-primary" id="saveSettingsBtn">
+                            Enregistrer
+                        </button>
+
+                        <div class="accordion">
+                            <button class="accordion-header" type="button">
+                                <span>📚 Comment obtenir un token GitHub</span>
+                                <span class="accordion-icon">▼</span>
+                            </button>
+                            <div class="accordion-content">
+                                <ol>
+                                    <li>Allez sur <code>github.com/settings/tokens/new</code></li>
+                                    <li>Entrez une description: "Finance Tracker"</li>
+                                    <li>Sélectionnez le scope <code>gist</code></li>
+                                    <li>Cliquez "Generate token"</li>
+                                    <li>Copiez le token (il ne s'affichera qu'une fois)</li>
+                                    <li>Collez-le ici et cliquez "Enregistrer"</li>
+                                </ol>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <h2 style="font-size: 16px; margin-bottom: 16px;">Taux de change</h2>
+                        <div class="form-group">
+                            <label class="form-label">1 EUR = <span id="rateDisplayValue">6600</span> BIF</label>
+                            <input type="number" id="rateInput" min="1000" step="1">
+                        </div>
+                        <button class="btn-primary" id="saveRateBtn">
+                            Enregistrer le taux
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Mobile Tab Bar -->
+        <div class="tab-bar">
+            <button class="tab-nav-btn active" data-tab="dashboard">
+                <div class="tab-icon">📊</div>
+                <div>Tableau</div>
+            </button>
+            <button class="tab-nav-btn" data-tab="add-entry">
+                <div class="tab-icon">➕</div>
+                <div>Ajouter</div>
+            </button>
+            <button class="tab-nav-btn" data-tab="report">
+                <div class="tab-icon">📈</div>
+                <div>Rapport</div>
+            </button>
+            <button class="tab-nav-btn" data-tab="settings">
+                <div class="tab-icon">⚙️</div>
+                <div>Paramètres</div>
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // ==================== STATE & CONFIG ====================
+        const EXPENSE_CATEGORIES = [
+            'Alimentation',
+            'Transport',
+            'Logement',
+            'Santé',
+            'Loisirs',
+            'Communication',
+            'Autre'
+        ];
+
+        const INCOME_CATEGORIES = [
+            'Salaire',
+            'Freelance',
+            'Don',
+            'Remboursement',
+            'Autre'
+        ];
+
+        let state = {
+            currentDate: new Date(),
+            currentMonth: new Date(),
+            entries: [],
+            rate: 6600,
+            token: '',
+            gistId: '',
+            syncStatus: 'synced', // synced, syncing, offline
+            selectedType: 'income',
+            selectedCurrency: 'BIF',
+            selectedCategory: '',
+            chartInstance: null
+        };
+
+        // ==================== INITIALIZATION ====================
+        document.addEventListener('DOMContentLoaded', () => {
+            loadSettings();
+            initializeInputs();
+            setupEventListeners();
+            updateDashboard();
+            updateAddEntry();
+            updateReport();
+        });
+
+        function loadSettings() {
+            const stored = localStorage.getItem('financeTrackerSettings');
+            if (stored) {
+                const settings = JSON.parse(stored);
+                state.token = settings.token || '';
+                state.gistId = settings.gistId || '';
+                state.rate = settings.rate || 6600;
+            }
+            updateSettingsUI();
+        }
+
+        function initializeInputs() {
+            const today = new Date();
+            const dateStr = today.toISOString().split('T')[0];
+            document.getElementById('dateInput').value = dateStr;
+            document.getElementById('rateInput').value = state.rate;
+        }
+
+        function setupEventListeners() {
+            // Tab Navigation
+            document.querySelectorAll('.nav-button').forEach(btn => {
+                btn.addEventListener('click', (e) => switchTab(e.target.closest('button').dataset.tab));
+            });
+
+            document.querySelectorAll('.tab-nav-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const tab = e.currentTarget.dataset.tab;
+                    switchTab(tab);
+                });
+            });
+
+            // Add Entry Form
+            document.querySelectorAll('[data-type]').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    state.selectedType = e.target.dataset.type;
+                    document.querySelectorAll('[data-type]').forEach(b => b.classList.remove('active'));
+                    e.target.classList.add('active');
+                    updateAddEntry();
+                });
+            });
+
+            document.querySelectorAll('[data-currency]').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    state.selectedCurrency = e.target.dataset.currency;
+                    document.querySelectorAll('[data-currency]').forEach(b => b.classList.remove('active'));
+                    e.target.classList.add('active');
+                    updateConversionPreview();
+                });
+            });
+
+            document.getElementById('amountInput').addEventListener('input', updateConversionPreview);
+
+            // Category Selection
+            document.getElementById('categoryGrid').addEventListener('click', (e) => {
+                if (e.target.classList.contains('category-pill')) {
+                    document.querySelectorAll('.category-pill').forEach(p => p.classList.remove('selected'));
+                    e.target.classList.add('selected');
+                    state.selectedCategory = e.target.textContent;
+                }
+            });
+
+            document.getElementById('addEntryBtn').addEventListener('click', addEntry);
+
+            // Date Navigation
+            document.getElementById('prevDayBtn').addEventListener('click', () => {
+                state.currentDate.setDate(state.currentDate.getDate() - 1);
+                updateDashboard();
+            });
+
+            document.getElementById('nextDayBtn').addEventListener('click', () => {
+                state.currentDate.setDate(state.currentDate.getDate() + 1);
+                updateDashboard();
+            });
+
+            // Month Navigation
+            document.getElementById('prevMonthBtn').addEventListener('click', () => {
+                state.currentMonth.setMonth(state.currentMonth.getMonth() - 1);
+                _lastLoadedMonthStr = null;
+                updateReport();
+            });
+
+            document.getElementById('nextMonthBtn').addEventListener('click', () => {
+                state.currentMonth.setMonth(state.currentMonth.getMonth() + 1);
+                _lastLoadedMonthStr = null;
+                updateReport();
+            });
+
+            // Settings
+            document.getElementById('tokenToggle').addEventListener('click', togglePasswordVisibility);
+            document.getElementById('testConnectionBtn').addEventListener('click', testConnection);
+            document.getElementById('createGistBtn').addEventListener('click', createNewGist);
+            document.getElementById('saveSettingsBtn').addEventListener('click', saveSettings);
+            document.getElementById('saveRateBtn').addEventListener('click', saveRate);
+
+            // Accordion
+            document.querySelector('.accordion-header').addEventListener('click', toggleAccordion);
+        }
+
+        // ==================== UI UPDATES ====================
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.getElementById(tabName).classList.add('active');
+
+            document.querySelectorAll('.nav-button').forEach(b => b.classList.remove('active'));
+            document.querySelector(`.nav-button[data-tab="${tabName}"]`)?.classList.add('active');
+
+            document.querySelectorAll('.tab-nav-btn').forEach(b => b.classList.remove('active'));
+            document.querySelector(`.tab-nav-btn[data-tab="${tabName}"]`)?.classList.add('active');
+
+            if (tabName === 'report') {
+                setTimeout(() => updateReport(), 0);
+            }
+        }
+
+        function updateAddEntry() {
+            const categories = state.selectedType === 'income' ? INCOME_CATEGORIES : EXPENSE_CATEGORIES;
+            const categoryLabel = state.selectedType === 'income' ? 'Catégorie Revenu' : 'Catégorie Dépense';
+            
+            document.getElementById('categoryLabel').textContent = categoryLabel;
+            
+            const grid = document.getElementById('categoryGrid');
+            grid.innerHTML = categories.map(cat => 
+                `<button class="category-pill" data-category="${cat}">${cat}</button>`
+            ).join('');
+
+            document.querySelectorAll('.category-pill').forEach(pill => {
+                pill.addEventListener('click', (e) => {
+                    document.querySelectorAll('.category-pill').forEach(p => p.classList.remove('selected'));
+                    e.target.classList.add('selected');
+                    state.selectedCategory = e.target.dataset.category;
+                });
+            });
+
+            state.selectedCategory = categories[0];
+            document.querySelector('.category-pill')?.classList.add('selected');
+        }
+
+        function updateConversionPreview() {
+            const amount = parseFloat(document.getElementById('amountInput').value) || 0;
+            if (amount === 0) {
+                document.getElementById('conversionPreview').textContent = '';
+                return;
+            }
+
+            let preview = '';
+            if (state.selectedCurrency === 'BIF') {
+                const eur = (amount / state.rate).toFixed(2);
+                preview = `≈ ${eur.replace('.', ',')} €`;
+            } else {
+                const bif = Math.round(amount * state.rate);
+                preview = `≈ ${formatNumber(bif)} BIF`;
+            }
+            document.getElementById('conversionPreview').textContent = preview;
+        }
+
+        function updateDashboard() {
+            const dateStr = state.currentDate.toISOString().split('T')[0];
+            document.getElementById('dateDisplay').textContent = formatDateFR(state.currentDate);
+
+            // Load data for current month
+            loadMonthData();
+
+            const dayEntries = state.entries.filter(e => e.date === dateStr);
+            
+            const income = dayEntries.filter(e => e.type === 'income').reduce((s, e) => s + e.amount_bif, 0);
+            const expenses = dayEntries.filter(e => e.type === 'expense').reduce((s, e) => s + e.amount_bif, 0);
+            const balance = income - expenses;
+
+            // Update summary cards
+            updateSummaryCard('dailyIncome', income);
+            updateSummaryCard('dailyExpense', expenses);
+            updateSummaryCard('dailyBalance', balance);
+
+            const balanceCard = document.getElementById('balanceCard');
+            balanceCard.classList.remove('balance-positive', 'balance-negative');
+            balanceCard.classList.add(balance >= 0 ? 'balance-positive' : 'balance-negative');
+
+            // Update entry list
+            updateEntryList(dayEntries);
+        }
+
+        function updateReport() {
+            const monthStr = `${state.currentMonth.getFullYear()}-${String(state.currentMonth.getMonth() + 1).padStart(2, '0')}`;
+            
+            const monthName = state.currentMonth.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
+            document.getElementById('monthDisplay').textContent = monthName.charAt(0).toUpperCase() + monthName.slice(1);
+
+            loadMonthData();
+
+            const monthEntries = state.entries.filter(e => e.date.startsWith(monthStr));
+            
+            const income = monthEntries.filter(e => e.type === 'income').reduce((s, e) => s + e.amount_bif, 0);
+            const expenses = monthEntries.filter(e => e.type === 'expense').reduce((s, e) => s + e.amount_bif, 0);
+            const balance = income - expenses;
+
+            updateSummaryCard('monthlyIncome', income);
+            updateSummaryCard('monthlyExpense', expenses);
+            updateSummaryCard('monthlyBalance', balance);
+
+            const balanceCard = document.getElementById('monthlyBalanceCard');
+            balanceCard.classList.remove('balance-positive', 'balance-negative');
+            balanceCard.classList.add(balance >= 0 ? 'balance-positive' : 'balance-negative');
+
+            // Build report table
+            const daysInMonth = new Date(state.currentMonth.getFullYear(), state.currentMonth.getMonth() + 1, 0).getDate();
+            let tableHTML = '';
+            
+            let bestDay = { date: '', balance: -Infinity };
+            let worstDay = { date: '', balance: Infinity };
+
+            for (let day = 1; day <= daysInMonth; day++) {
+                const date = `${monthStr}-${String(day).padStart(2, '0')}`;
+                const dayIncome = monthEntries.filter(e => e.date === date && e.type === 'income').reduce((s, e) => s + e.amount_bif, 0);
+                const dayExpenses = monthEntries.filter(e => e.date === date && e.type === 'expense').reduce((s, e) => s + e.amount_bif, 0);
+                const dayBalance = dayIncome - dayExpenses;
+
+                if (dayIncome > 0 || dayExpenses > 0) {
+                    if (dayBalance > bestDay.balance) {
+                        bestDay = { date, balance: dayBalance };
+                    }
+                    if (dayBalance < worstDay.balance) {
+                        worstDay = { date, balance: dayBalance };
+                    }
+
+                    const dateObj = new Date(date);
+                    const dateLabel = dateObj.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric' });
+                    
+                    const highlight = (date === bestDay.date || date === worstDay.date) ? ' highlight' : '';
+                    
+                    tableHTML += `
+                        <tr${highlight}>
+                            <td>${dateLabel}</td>
+                            <td><span class="currency-bif">${formatNumber(dayIncome)} BIF</span></td>
+                            <td><span class="currency-eur">≈ ${(dayIncome / state.rate).toFixed(2)} €</span></td>
+                            <td><span class="currency-bif">${formatNumber(dayExpenses)} BIF</span></td>
+                            <td><span class="currency-eur">≈ ${(dayExpenses / state.rate).toFixed(2)} €</span></td>
+                            <td><span class="currency-bif" style="color: ${dayBalance >= 0 ? 'var(--color-accent-green)' : 'var(--color-accent-red)'}">${formatNumber(dayBalance)} BIF</span></td>
+                            <td><span class="currency-eur" style="color: ${dayBalance >= 0 ? 'var(--color-accent-green)' : 'var(--color-accent-red)'}">${(dayBalance / state.rate).toFixed(2)} €</span></td>
+                        </tr>
+                    `;
+                }
+            }
+
+            document.getElementById('reportTableBody').innerHTML = tableHTML || '<tr><td colspan="7" style="text-align: center; padding: 20px;">Aucune donnée ce mois</td></tr>';
+
+            // Update expense chart
+            updateExpenseChart(monthEntries);
+        }
+
+        function updateSummaryCard(prefix, amountBif) {
+            const amountEur = (amountBif / state.rate).toFixed(2);
+            document.getElementById(prefix + 'Value').textContent = formatNumber(amountBif) + ' BIF';
+            document.getElementById(prefix + 'ValueEur').textContent = `≈ ${formatNumber(parseFloat(amountEur), 'EUR')} €`;
+        }
+
+        function updateEntryList(entries) {
+            const list = document.getElementById('entryList');
+            
+            if (entries.length === 0) {
+                list.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">📭</div>
+                        <p>Aucune transaction aujourd'hui</p>
+                    </div>
+                `;
+                return;
+            }
+
+            list.innerHTML = entries.map(entry => `
+                <div class="entry-item">
+                    <div class="entry-info">
+                        <div class="entry-label">${entry.label}</div>
+                        <div class="entry-category">${entry.category}</div>
+                    </div>
+                    <div class="entry-amount ${entry.type}">
+                        <div class="entry-amount-bif">${entry.type === 'income' ? '+' : '-'} ${formatNumber(entry.amount_bif)} BIF</div>
+                        <div class="entry-amount-eur">≈ ${(entry.amount_bif / state.rate).toFixed(2)} €</div>
+                    </div>
+                    <div class="entry-actions">
+                        <button class="btn-delete" data-id="${entry.id}">Supprimer</button>
+                    </div>
+                </div>
+            `).join('');
+
+            document.querySelectorAll('.btn-delete').forEach(btn => {
+                btn.addEventListener('click', (e) => deleteEntry(e.target.dataset.id));
+            });
+        }
+
+        function updateExpenseChart(entries) {
+            const expenseEntries = entries.filter(e => e.type === 'expense');
+            const categoryTotals = {};
+
+            EXPENSE_CATEGORIES.forEach(cat => {
+                categoryTotals[cat] = expenseEntries
+                    .filter(e => e.category === cat)
+                    .reduce((s, e) => s + e.amount_bif, 0);
+            });
+
+            const labels = Object.keys(categoryTotals).filter(cat => categoryTotals[cat] > 0);
+            const data = labels.map(cat => categoryTotals[cat]);
+
+            const ctx = document.getElementById('expenseChart').getContext('2d');
+            
+            if (state.chartInstance) {
+                state.chartInstance.destroy();
+            }
+
+            state.chartInstance = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: data,
+                        backgroundColor: [
+                            '#10b981', '#3b82f6', '#f59e0b', '#8b5cf6',
+                            '#ec4899', '#06b6d4', '#ef4444'
+                        ],
+                        borderColor: 'var(--color-surface)',
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: {
+                                color: 'var(--color-text)',
+                                padding: 20,
+                                font: { size: 12 }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function updateSettingsUI() {
+            document.getElementById('tokenInput').value = state.token;
+            document.getElementById('gistIdInput').value = state.gistId;
+            document.getElementById('rateInput').value = state.rate;
+            document.getElementById('rateDisplayValue').textContent = state.rate;
+        }
+
+        // ==================== ENTRY MANAGEMENT ====================
+        async function addEntry() {
+            const amount = parseFloat(document.getElementById('amountInput').value);
+            const label = document.getElementById('labelInput').value.trim();
+            const date = document.getElementById('dateInput').value;
+
+            if (!amount || !label || !state.selectedCategory) {
+                alert('Remplissez tous les champs');
+                return;
+            }
+
+            const amountBif = state.selectedCurrency === 'BIF' 
+                ? amount 
+                : Math.round(amount * state.rate);
+            
+            const amountEur = (amountBif / state.rate);
+
+            const entry = {
+                id: crypto.randomUUID(),
+                date,
+                type: state.selectedType,
+                label,
+                input_currency: state.selectedCurrency,
+                input_amount: amount,
+                amount_bif: amountBif,
+                amount_eur: parseFloat(amountEur.toFixed(4)),
+                category: state.selectedCategory,
+                createdAt: new Date().toISOString()
+            };
+
+            state.entries.push(entry);
+            await syncToGist();
+
+            // Reset form
+            document.getElementById('amountInput').value = '';
+            document.getElementById('labelInput').value = '';
+            document.getElementById('conversionPreview').textContent = '';
+            
+            updateDashboard();
+            alert('Transaction ajoutée !');
+        }
+
+        function deleteEntry(id) {
+            if (confirm('Supprimer cette transaction ?')) {
+                state.entries = state.entries.filter(e => e.id !== id);
+                syncToGist();
+                updateDashboard();
+            }
+        }
+
+        // ==================== GIST SYNC ====================
+        let _lastLoadedMonthStr = null;
+
+        async function loadMonthData() {
+            const monthStr = `${state.currentMonth.getFullYear()}-${String(state.currentMonth.getMonth() + 1).padStart(2, '0')}`;
+            
+            if (!state.gistId || !state.token) {
+                loadFromLocalStorage();
+                return;
+            }
+
+            // Skip redundant network calls for the same month within the same session
+            if (_lastLoadedMonthStr === monthStr && state.syncStatus === 'synced') {
+                return;
+            }
+
+            try {
+                setSyncStatus('syncing');
+                const response = await fetch(`https://api.github.com/gists/${state.gistId}`, {
+                    headers: {
+                        'Authorization': `Bearer ${state.token}`,
+                        'Accept': 'application/vnd.github+json'
+                    }
+                });
+
+                if (!response.ok) {
+                    loadFromLocalStorage();
+                    setSyncStatus('offline');
+                    return;
+                }
+
+                const gist = await response.json();
+                const fileName = `${monthStr}.json`;
+                
+                if (gist.files[fileName]) {
+                    const data = JSON.parse(gist.files[fileName].content);
+                    state.entries = data.entries || [];
+                    state.rate = data.exchange_rate || 6600;
+                } else {
+                    state.entries = [];
+                }
+
+                saveToLocalStorage();
+                setSyncStatus('synced');
+                _lastLoadedMonthStr = monthStr;
+            } catch (error) {
+                console.error('Sync error:', error);
+                loadFromLocalStorage();
+                setSyncStatus('offline');
+            }
+        }
+
+        async function syncToGist() {
+            if (!state.gistId || !state.token) {
+                saveToLocalStorage();
+                return;
+            }
+
+            const monthStr = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
+            const fileName = `${monthStr}.json`;
+            const monthEntries = state.entries.filter(e => e.date.startsWith(monthStr));
+
+            const data = {
+                month: monthStr,
+                exchange_rate: state.rate,
+                entries: monthEntries
+            };
+
+            try {
+                setSyncStatus('syncing');
+                const response = await fetch(`https://api.github.com/gists/${state.gistId}`, {
+                    method: 'PATCH',
+                    headers: {
+                        'Authorization': `Bearer ${state.token}`,
+                        'Accept': 'application/vnd.github+json',
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        files: {
+                            [fileName]: {
+                                content: JSON.stringify(data, null, 2)
+                            }
+                        }
+                    })
+                });
+
+                if (response.ok) {
+                    saveToLocalStorage();
+                    setSyncStatus('synced');
+                } else {
+                    setSyncStatus('offline');
+                }
+            } catch (error) {
+                console.error('Sync error:', error);
+                setSyncStatus('offline');
+            }
+        }
+
+        function saveToLocalStorage() {
+            const monthStr = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
+            const monthEntries = state.entries.filter(e => e.date.startsWith(monthStr));
+            
+            const data = {
+                month: monthStr,
+                exchange_rate: state.rate,
+                entries: monthEntries
+            };
+
+            localStorage.setItem(`financeData_${monthStr}`, JSON.stringify(data));
+        }
+
+        function loadFromLocalStorage() {
+            const monthStr = `${state.currentMonth.getFullYear()}-${String(state.currentMonth.getMonth() + 1).padStart(2, '0')}`;
+            const stored = localStorage.getItem(`financeData_${monthStr}`);
+            
+            if (stored) {
+                const data = JSON.parse(stored);
+                state.entries = data.entries || [];
+                state.rate = data.exchange_rate || 6600;
+            } else {
+                state.entries = [];
+            }
+        }
+
+        function setSyncStatus(status) {
+            state.syncStatus = status;
+            const badge = document.getElementById('syncBadge');
+            const icon = document.getElementById('syncIcon');
+            const text = document.getElementById('syncText');
+
+            badge.className = `sync-badge ${status}`;
+            
+            if (status === 'synced') {
+                icon.textContent = '✅';
+                text.textContent = 'Synchronisé';
+            } else if (status === 'syncing') {
+                icon.innerHTML = '<span class="spinner"></span>';
+                text.textContent = 'Sync...';
+            } else {
+                icon.textContent = '📴';
+                text.textContent = 'Hors ligne (cache)';
+            }
+        }
+
+        // ==================== SETTINGS ====================
+        async function testConnection() {
+            const token = document.getElementById('tokenInput').value;
+            const gistId = document.getElementById('gistIdInput').value;
+
+            if (!token || !gistId) {
+                showSettingsMessage('Remplissez token et gist ID', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch(`https://api.github.com/gists/${gistId}`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Accept': 'application/vnd.github+json'
+                    }
+                });
+
+                if (response.ok) {
+                    showSettingsMessage('✅ Connexion réussie !', 'success');
+                } else if (response.status === 404) {
+                    showSettingsMessage('❌ Gist non trouvé. Vérifiez l\'ID.', 'error');
+                } else if (response.status === 401) {
+                    showSettingsMessage('❌ Token invalide', 'error');
+                } else {
+                    showSettingsMessage('❌ Erreur de connexion', 'error');
+                }
+            } catch (error) {
+                showSettingsMessage('❌ Erreur réseau', 'error');
+            }
+        }
+
+        async function createNewGist() {
+            const token = document.getElementById('tokenInput').value;
+
+            if (!token) {
+                showSettingsMessage('Entrez un token GitHub d\'abord', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch('https://api.github.com/gists', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Accept': 'application/vnd.github+json',
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        description: 'Fleury Finance Tracker Data',
+                        public: false,
+                        files: {
+                            'README.md': {
+                                content: 'Personal finance tracker. Do not edit manually.'
+                            }
+                        }
+                    })
+                });
+
+                if (response.ok) {
+                    const gist = await response.json();
+                    document.getElementById('gistIdInput').value = gist.id;
+
+                    // Auto-save token + gistId immediately
+                    state.token = token;
+                    state.gistId = gist.id;
+                    const settings = JSON.parse(localStorage.getItem('financeTrackerSettings') || '{}');
+                    settings.token = token;
+                    settings.gistId = gist.id;
+                    localStorage.setItem('financeTrackerSettings', JSON.stringify(settings));
+
+                    showSettingsMessage(`✅ Gist créé et enregistré ! ID: ${gist.id}`, 'success');
+                    loadMonthData();
+                } else {
+                    const errData = await response.json().catch(() => ({}));
+                    showSettingsMessage(`❌ Erreur création Gist: ${errData.message || response.status}`, 'error');
+                }
+            } catch (error) {
+                showSettingsMessage('❌ Erreur réseau', 'error');
+            }
+        }
+
+        function saveSettings() {
+            const token = document.getElementById('tokenInput').value;
+            const gistId = document.getElementById('gistIdInput').value;
+
+            if (!token || !gistId) {
+                showSettingsMessage('Remplissez tous les champs', 'error');
+                return;
+            }
+
+            state.token = token;
+            state.gistId = gistId;
+
+            localStorage.setItem('financeTrackerSettings', JSON.stringify({
+                token,
+                gistId,
+                rate: state.rate
+            }));
+
+            showSettingsMessage('✅ Paramètres enregistrés', 'success');
+            _lastLoadedMonthStr = null;
+            loadMonthData();
+        }
+
+        function saveRate() {
+            const rate = parseFloat(document.getElementById('rateInput').value);
+
+            if (isNaN(rate) || rate < 1000) {
+                showSettingsMessage('Entrez un taux valide (> 1000)', 'error');
+                return;
+            }
+
+            state.rate = rate;
+            document.getElementById('rateDisplayValue').textContent = rate;
+
+            const settings = JSON.parse(localStorage.getItem('financeTrackerSettings') || '{}');
+            settings.rate = rate;
+            localStorage.setItem('financeTrackerSettings', JSON.stringify(settings));
+
+            syncToGist();
+            showSettingsMessage('✅ Taux enregistré', 'success');
+            updateDashboard();
+            updateReport();
+        }
+
+        function showSettingsMessage(message, type) {
+            const container = document.getElementById('settingsMessage');
+            container.innerHTML = `<div class="${type}-message">${message}</div>`;
+            setTimeout(() => {
+                container.innerHTML = '';
+            }, 3000);
+        }
+
+        function togglePasswordVisibility() {
+            const input = document.getElementById('tokenInput');
+            const isPassword = input.type === 'password';
+            input.type = isPassword ? 'text' : 'password';
+            document.getElementById('tokenToggle').textContent = isPassword ? '👁️‍🗨️' : '👁️';
+        }
+
+        function toggleAccordion() {
+            const header = document.querySelector('.accordion-header');
+            const content = document.querySelector('.accordion-content');
+            const icon = document.querySelector('.accordion-icon');
+
+            content.classList.toggle('open');
+            icon.classList.toggle('open');
+        }
+
+        // ==================== UTILITIES ====================
+        function formatNumber(num, type = 'BIF') {
+            if (type === 'EUR') {
+                return parseFloat(num).toLocaleString('fr-FR', {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2
+                });
+            }
+            return Math.round(num).toLocaleString('fr-FR');
+        }
+
+        function formatDateFR(date) {
+            return date.toLocaleDateString('fr-FR', {
+                weekday: 'long',
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+            }).replace(/^\w/, (c) => c.toUpperCase());
+        }
+    </script>
+</body>
+</html>
