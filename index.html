@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>Fleury Finance</title>
+<title>Fleury Finance — Pro</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <style>
 /* ================================================
@@ -935,6 +935,26 @@ body {
 }
 
 /* ================================================
+   WEEKDAY HEATMAP
+   ================================================ */
+.heat-row { display: flex; gap: 6px; }
+.heat-col { flex: 1; text-align: center; }
+.heat-bar-track { height: 64px; background: var(--slate); border-radius: 6px; display: flex; align-items: flex-end; overflow: hidden; }
+.heat-bar-fill { width: 100%; border-radius: 6px 6px 0 0; transition: height .4s ease; }
+.heat-label { font-size: 9px; color: var(--dim); margin-top: 5px; text-transform: uppercase; letter-spacing: .4px; }
+.heat-val { font-size: 9px; color: var(--text); font-weight: 700; margin-top: 2px; font-variant-numeric: tabular-nums; }
+
+/* ================================================
+   RECURRING BADGE
+   ================================================ */
+.rec-tag {
+  display: inline-flex; align-items: center; gap: 3px;
+  font-size: 9px; font-weight: 700; padding: 1px 6px;
+  border-radius: 4px; background: rgba(167,139,250,.15); color: var(--purple);
+  margin-left: 6px; vertical-align: middle;
+}
+
+/* ================================================
    PRINT
    ================================================ */
 @media print {
@@ -955,7 +975,7 @@ body {
       <div class="sb-logo-mark">F₣</div>
       <div>
         <div class="sb-logo-name">Fleury Finance</div>
-        <div class="sb-logo-sub">Tracker Personnel</div>
+        <div class="sb-logo-sub">Tracker Personnel Pro</div>
       </div>
     </div>
     <div class="sb-nav">
@@ -968,6 +988,7 @@ body {
       <button class="sb-btn" data-pg="goals"><span class="sb-icon">🏆</span>Objectifs</button>
       <button class="sb-btn" data-pg="analytics"><span class="sb-icon">📈</span>Analytics</button>
       <button class="sb-btn" data-pg="search"><span class="sb-icon">🔍</span>Recherche</button>
+      <button class="sb-btn" data-pg="recurring"><span class="sb-icon">🔁</span>Récurrents</button>
       <div class="sb-section" style="margin-top:8px">Compte</div>
       <button class="sb-btn" data-pg="settings"><span class="sb-icon">⚙️</span>Paramètres</button>
     </div>
@@ -1097,6 +1118,14 @@ body {
           <div class="fg">
             <label class="fl">Note (optionnel)</label>
             <input class="fi" type="text" id="noteIn" placeholder="Remarque…" autocomplete="off">
+          </div>
+          <div class="fg">
+            <label class="fl">Récurrence</label>
+            <select class="fi" id="recurIn">
+              <option value="none">Aucune</option>
+              <option value="weekly">Hebdomadaire</option>
+              <option value="monthly">Mensuelle</option>
+            </select>
           </div>
           <button class="btn btn-primary" id="addBtn">Ajouter la transaction</button>
         </div>
@@ -1260,6 +1289,10 @@ body {
           </div>
         </div>
         <div class="card card-p" style="margin-top:10px">
+          <div class="sh-title" style="margin-bottom:10px">Dépenses par jour de la semaine</div>
+          <div id="weekdayHeat"></div>
+        </div>
+        <div class="card card-p" style="margin-top:10px">
           <div class="sh-title" style="margin-bottom:10px">Insights intelligents</div>
           <div id="aInsights"></div>
         </div>
@@ -1283,6 +1316,26 @@ body {
         </div>
         <div id="sCount" style="font-size:11px;color:var(--dim);text-align:center;padding:4px 0;display:none"></div>
         <div class="entry-list" id="sResults"></div>
+      </div>
+
+      <!-- RECURRING -->
+      <div class="page" id="pg-recurring">
+        <div class="ph"><div class="ph-left"><h1>Transactions récurrentes</h1><p>Revenus et charges fixes automatisés</p></div></div>
+        <div class="stat-grid sg2" style="margin-bottom:16px">
+          <div class="sc inc">
+            <div class="sc-label"><div class="sc-dot"></div>Revenus fixes / mois</div>
+            <div class="sc-bif" id="recInc">0 BIF</div>
+            <div class="sc-eur" id="recIncE">≈ 0 €</div>
+          </div>
+          <div class="sc exp">
+            <div class="sc-label"><div class="sc-dot"></div>Charges fixes / mois</div>
+            <div class="sc-bif" id="recExp">0 BIF</div>
+            <div class="sc-eur" id="recExpE">≈ 0 €</div>
+          </div>
+        </div>
+        <div class="sh"><div class="sh-title">Modèles actifs</div></div>
+        <div class="entry-list" id="recurList"></div>
+        <div class="empty" id="recurEmpty"><span class="empty-icon">🔁</span><p>Aucune récurrence. Cochez "Récurrence" en ajoutant une transaction.</p></div>
       </div>
 
       <!-- SETTINGS -->
@@ -1333,11 +1386,16 @@ body {
           </div>
         </div>
         <div class="card card-pm" style="margin-bottom:12px">
-          <div class="sg-label">📤 Export</div>
-          <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <div class="sg-label">📤 Export / Import</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
             <button class="btn btn-ghost btn-sm" onclick="exportCSV()">📊 CSV ce mois</button>
             <button class="btn btn-ghost btn-sm" onclick="exportAll()">📁 CSV complet</button>
           </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn btn-ghost btn-sm" onclick="exportJSON()">📦 Export JSON</button>
+            <button class="btn btn-ghost btn-sm" onclick="document.getElementById('importFile').click()">📂 Import JSON</button>
+          </div>
+          <input type="file" id="importFile" accept=".json" style="display:none" onchange="importJSON(event)">
         </div>
         <div class="card card-pm">
           <div class="sg-label">⚠️ Données</div>
@@ -1388,6 +1446,14 @@ body {
     <div class="fg"><label class="fl">Catégorie</label><div class="cat-grid" id="eCatGrid"></div></div>
     <div class="fg"><label class="fl">Date</label><input class="fi" type="date" id="eDate"></div>
     <div class="fg"><label class="fl">Note</label><input class="fi" type="text" id="eNote" placeholder="Optionnel…" autocomplete="off"></div>
+    <div class="fg">
+      <label class="fl">Récurrence</label>
+      <select class="fi" id="eRecur">
+        <option value="none">Aucune</option>
+        <option value="weekly">Hebdomadaire</option>
+        <option value="monthly">Mensuelle</option>
+      </select>
+    </div>
     <input type="hidden" id="eId">
     <button class="btn btn-primary" onclick="saveEdit()">Enregistrer les modifications</button>
   </div>
@@ -1470,6 +1536,7 @@ const S={
 // ==============================================
 (function(){
   loadSettings(); loadBudgets(); loadGoals(); loadAllCache();
+  applyDueRecurrences();
   setupNav();
   buildCatGrid('inc');
   document.getElementById('dateIn').value=ds(new Date());
@@ -1530,6 +1597,7 @@ function go(pg){
   if(pg==='budgets') updateBudgets();
   if(pg==='goals') renderGoals();
   if(pg==='settings') updateSetUI();
+  if(pg==='recurring') updateRecurring();
 }
 
 // ==============================================
@@ -1569,18 +1637,20 @@ async function addEntry(){
   const lbl=document.getElementById('lblIn').value.trim();
   const date=document.getElementById('dateIn').value;
   const note=document.getElementById('noteIn').value.trim();
+  const recur=document.getElementById('recurIn').value;
   if(!amt||!lbl||!date||!S.cat){toast('Remplissez tous les champs','err');return;}
   const bif=S.curr==='BIF'?amt:Math.round(amt*S.rate);
   const entry={
     id:crypto.randomUUID(),date,type:S.type,label:lbl,
     ic:S.curr,ia:amt,bif,eur:parseFloat((bif/S.rate).toFixed(4)),
-    cat:S.cat,note,ca:new Date().toISOString()
+    cat:S.cat,note,ca:new Date().toISOString(),recur:recur!=='none'?recur:undefined
   };
   S.entries.push(entry);
   saveMo(date.slice(0,7));
   document.getElementById('amtIn').value='';
   document.getElementById('lblIn').value='';
   document.getElementById('noteIn').value='';
+  document.getElementById('recurIn').value='none';
   document.getElementById('convPrev').textContent='Entrez un montant';
   toast('Transaction ajoutée : '+lbl,'suc');
   updateDash();
@@ -1663,7 +1733,7 @@ function renderList(entries,id,actions){
     return `<div class="ei ${e.type}" onclick="openEdit('${e.id}')">
       <div class="ei-icon">${cat.e}</div>
       <div class="ei-body">
-        <div class="ei-label">${esc(e.label)}</div>
+        <div class="ei-label">${esc(e.label)}${e.recur?`<span class="rec-tag">🔁 ${e.recur==='monthly'?'Mensuel':'Hebdo'}</span>`:''}</div>
         <div class="ei-meta">${e.cat}${e.note?' · '+esc(e.note):''} · ${tFmt(e.ca)}</div>
       </div>
       <div class="ei-amounts">
@@ -2004,6 +2074,7 @@ function updateAnalytics(){
   }
   document.getElementById('topExp').innerHTML=topCats('exp',ECAT);
   document.getElementById('topInc').innerHTML=topCats('inc',ICAT);
+  renderWeekdayHeat();
   // Insights
   const ins=[];
   const all=S.entries;
@@ -2016,6 +2087,92 @@ function updateAnalytics(){
   const sr=cI>0?((cB/cI)*100).toFixed(0):0;
   ins.push(sr>=20?{c:'good',t:'💰 Taux d\'épargne excellent',b:`${sr}% de vos revenus épargnés. Objectif standard: 20%.`}:{c:'info',t:'💡 Augmentez votre épargne',b:`Taux actuel: ${sr}%. Essayez d'atteindre 20% de vos revenus.`});
   document.getElementById('aInsights').innerHTML=ins.map(i=>`<div class="ic ${i.c}"><div class="ic-title">${i.t}</div><div class="ic-body">${i.b}</div></div>`).join('');
+}
+
+function renderWeekdayHeat(){
+  const days=['Lun','Mar','Mer','Jeu','Ven','Sam','Dim'];
+  const totals=[0,0,0,0,0,0,0];
+  S.entries.filter(e=>e.type==='exp').forEach(e=>{
+    const d=new Date(e.date+'T00:00:00');
+    totals[(d.getDay()+6)%7]+=e.bif;
+  });
+  const max=Math.max(...totals,1);
+  document.getElementById('weekdayHeat').innerHTML=`<div class="heat-row">`+
+    days.map((d,i)=>{
+      const pct=Math.max(6,Math.round(totals[i]/max*100));
+      const col=totals[i]>0?`rgba(255,95,87,${(0.25+pct/100*0.7).toFixed(2)})`:'var(--border)';
+      return `<div class="heat-col">
+        <div class="heat-bar-track"><div class="heat-bar-fill" style="height:${pct}%;background:${col}"></div></div>
+        <div class="heat-label">${d}</div>
+        <div class="heat-val">${totals[i]>0?fBs(totals[i]):'—'}</div>
+      </div>`;
+    }).join('')+`</div>`;
+}
+
+// ==============================================
+// RECURRING
+// ==============================================
+function applyDueRecurrences(){
+  const today=ds(new Date());
+  const seen=new Set();
+  let changed=false;
+  S.entries.filter(e=>e.recur).forEach(e=>{
+    const key=e.label+'|'+e.cat+'|'+e.recur+'|'+e.type;
+    if(seen.has(key)) return; seen.add(key);
+    // find latest occurrence of this recurring template
+    const occ=S.entries.filter(x=>(x.label+'|'+x.cat+'|'+(x.recur||e.recur)+'|'+x.type)===key && (x.recur||x.recurSource));
+    const latest=occ.reduce((a,b)=>a.date>b.date?a:b,occ[0]||e);
+    let next=new Date(latest.date);
+    if(e.recur==='monthly') next.setMonth(next.getMonth()+1);
+    else next.setDate(next.getDate()+7);
+    const nextStr=ds(next);
+    if(nextStr<=today){
+      const exists=S.entries.some(x=>x.date===nextStr && x.label===e.label && x.cat===e.cat);
+      if(!exists){
+        const ne={...e,id:crypto.randomUUID(),date:nextStr,ca:new Date().toISOString(),recurSource:true};
+        S.entries.push(ne); saveMo(nextStr.slice(0,7)); changed=true;
+      }
+    }
+  });
+  if(changed) toast('Transactions récurrentes générées 🔁','inf');
+}
+function updateRecurring(){
+  // unique templates = entries that have .recur set, deduped by label+cat+type+recur
+  const seen=new Set();
+  const templates=S.entries.filter(e=>e.recur).filter(e=>{
+    const key=e.label+'|'+e.cat+'|'+e.type+'|'+e.recur;
+    if(seen.has(key)) return false; seen.add(key); return true;
+  }).sort((a,b)=>b.date.localeCompare(a.date));
+  const el=document.getElementById('recurList');
+  const emp=document.getElementById('recurEmpty');
+  if(!templates.length){ el.innerHTML=''; emp.style.display='block'; }
+  else {
+    emp.style.display='none';
+    el.innerHTML=templates.map(e=>{
+      const cat=[...ECAT,...ICAT].find(c=>c.n===e.cat)||{e:'💳'};
+      const sign=e.type==='inc'?'+':'-';
+      return `<div class="ei ${e.type}">
+        <div class="ei-icon">${cat.e}</div>
+        <div class="ei-body">
+          <div class="ei-label">${esc(e.label)}<span class="rec-tag">🔁 ${e.recur==='monthly'?'Mensuel':'Hebdo'}</span></div>
+          <div class="ei-meta">${e.cat} · dernière: ${e.date}</div>
+        </div>
+        <div class="ei-amounts">
+          <div class="ei-bif">${sign}${fB(e.bif)} BIF</div>
+          <div class="ei-eur">≈ ${fE(e.bif/S.rate)} €</div>
+        </div>
+      </div>`;
+    }).join('');
+  }
+  const monthly=templates.filter(e=>e.recur==='monthly');
+  const weekly=templates.filter(e=>e.recur==='weekly');
+  const monthlyEquivFromWeekly=sum(weekly,'inc')*4.33;
+  const recIncTotal=sum(monthly,'inc')+weekly.filter(e=>e.type==='inc').reduce((s,e)=>s+e.bif,0)*4.33;
+  const recExpTotal=sum(monthly,'exp')+weekly.filter(e=>e.type==='exp').reduce((s,e)=>s+e.bif,0)*4.33;
+  document.getElementById('recInc').textContent=fB(recIncTotal)+' BIF';
+  document.getElementById('recIncE').textContent='≈ '+fE(recIncTotal/S.rate)+' €';
+  document.getElementById('recExp').textContent=fB(recExpTotal)+' BIF';
+  document.getElementById('recExpE').textContent='≈ '+fE(recExpTotal/S.rate)+' €';
 }
 
 // ==============================================
@@ -2054,6 +2211,7 @@ function openEdit(id){
   document.getElementById('eLbl').value=e.label;
   document.getElementById('eDate').value=e.date;
   document.getElementById('eNote').value=e.note||'';
+  document.getElementById('eRecur').value=e.recur||'none';
   setEType(e.type); buildECats(e.type,e.cat); updEPrev();
   document.getElementById('editModalTitle').textContent='Modifier: '+e.label;
   openModal('editModal');
@@ -2094,10 +2252,11 @@ async function saveEdit(){
   const lbl=document.getElementById('eLbl').value.trim();
   const date=document.getElementById('eDate').value;
   const note=document.getElementById('eNote').value.trim();
+  const recur=document.getElementById('eRecur').value;
   if(!amt||!lbl||!date){toast('Remplissez tous les champs','err');return;}
   const bif=S.eCurr==='BIF'?amt:Math.round(amt*S.rate);
   const idx=S.entries.findIndex(e=>e.id===id); if(idx===-1) return;
-  S.entries[idx]={...S.entries[idx],type:S.eType,label:lbl,date,note,cat:S.eCat,ic:S.eCurr,ia:amt,bif,eur:parseFloat((bif/S.rate).toFixed(4))};
+  S.entries[idx]={...S.entries[idx],type:S.eType,label:lbl,date,note,cat:S.eCat,ic:S.eCurr,ia:amt,bif,eur:parseFloat((bif/S.rate).toFixed(4)),recur:recur!=='none'?recur:undefined};
   saveMo(date.slice(0,7)); closeModal('editModal'); toast('Transaction modifiée','suc');
   updateDash(); syncGist(date.slice(0,7));
 }
@@ -2243,6 +2402,33 @@ function exportCSV(){
   dlCSV(S.entries.filter(e=>e.date.startsWith(mo)),'finances_'+mo);
 }
 function exportAll(){ dlCSV([...S.entries],'finances_complet'); }
+function exportJSON(){
+  const data={entries:S.entries,budgets:S.budgets,goals:S.goals,rate:S.rate,exportedAt:new Date().toISOString()};
+  const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');a.href=url;a.download='fleury-finance-backup.json';a.click();
+  URL.revokeObjectURL(url); toast('Export JSON téléchargé','suc');
+}
+function importJSON(ev){
+  const file=ev.target.files[0]; if(!file) return;
+  const reader=new FileReader();
+  reader.onload=e=>{
+    try{
+      const data=JSON.parse(e.target.result);
+      if(Array.isArray(data.entries)){
+        S.entries.push(...data.entries); dedup();
+        const months=new Set(data.entries.map(x=>x.date.slice(0,7)));
+        months.forEach(m=>saveMo(m));
+      }
+      if(data.budgets) { S.budgets={...S.budgets,...data.budgets}; saveBudgets(); }
+      if(data.goals) { S.goals.push(...data.goals); saveGoals(); }
+      toast('Import réussi ✓','suc');
+      updateDash();
+    }catch(err){ toast('Fichier JSON invalide','err'); }
+  };
+  reader.readAsText(file);
+  ev.target.value='';
+}
 function dlCSV(entries,name){
   if(!entries.length){toast('Aucune donnée','err');return;}
   const hdr='Date,Type,Description,Catégorie,Montant BIF,Montant EUR,Note\n';
